@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Заметки</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-top: 0; }
+    label { display: block; margin-bottom: 0.25rem; font-weight: 600; }
+    input, textarea { width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 6px; }
+    textarea { min-height: 120px; resize: vertical; }
+    .btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    button { padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid #333; cursor: pointer; font-size: 1rem; }
+    button.primary { background: #333; color: #fff; border-color: #333; }
+    button.secondary { background: #fff; }
+    button:hover { opacity: 0.9; }
+    #notesList { margin-top: 1.5rem; }
+    .note { padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 0.5rem; background: #fafafa; }
+    .note h3 { margin: 0 0 0.25rem 0; font-size: 1rem; }
+    .note .meta { font-size: 0.8rem; color: #666; margin-bottom: 0.25rem; }
+    .note .body { white-space: pre-wrap; font-size: 0.95rem; }
+    .hidden { display: none; }
+    .error { color: #c00; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Заметки</h1>
+  <form id="form">
+    <label for="title">Заголовок</label>
+    <input type="text" id="title" name="title" placeholder="Заголовок заметки">
+    <label for="body">Текст</label>
+    <textarea id="body" name="body" placeholder="Текст заметки"></textarea>
+    <div class="btns">
+      <button type="submit" class="primary">Сохранить</button>
+      <button type="button" id="cancelBtn">Отменить</button>
+      <button type="button" id="viewBtn">Посмотреть заметки</button>
+    </div>
+  </form>
+  <p id="error" class="error hidden"></p>
+  <section id="notesList" class="hidden">
+    <h2>Список заметок</h2>
+    <div id="notes"></div>
+  </section>
+
+  <script>
+    const form = document.getElementById('form');
+    const titleIn = document.getElementById('title');
+    const bodyIn = document.getElementById('body');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const viewBtn = document.getElementById('viewBtn');
+    const notesList = document.getElementById('notesList');
+    const notesContainer = document.getElementById('notes');
+    const errEl = document.getElementById('error');
+
+    function showErr(msg) {
+      errEl.textContent = msg || '';
+      errEl.classList.toggle('hidden', !msg);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showErr('');
+      const title = titleIn.value.trim();
+      const body = bodyIn.value.trim();
+      if (!title && !body) {
+        showErr('Введите заголовок или текст.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, body })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        titleIn.value = '';
+        bodyIn.value = '';
+        showErr('');
+        if (notesList.classList.contains('hidden') === false) loadNotes();
+      } catch (err) {
+        showErr(err.message || 'Ошибка сохранения');
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      titleIn.value = '';
+      bodyIn.value = '';
+      showErr('');
+    });
+
+    async function loadNotes() {
+      const res = await fetch('/api/notes');
+      if (!res.ok) { notesContainer.innerHTML = '<p class="error">Не удалось загрузить заметки</p>'; return; }
+      const notes = await res.json();
+      notesList.classList.remove('hidden');
+      if (notes.length === 0) {
+        notesContainer.innerHTML = '<p>Нет заметок.</p>';
+        return;
+      }
+      notesContainer.innerHTML = notes.map(n => {
+        const d = new Date(n.created_at).toLocaleString('ru');
+        return `<div class="note"><div class="meta">#${n.id} · ${d}</div><h3>${escapeHtml(n.title || '(без заголовка)')}</h3><div class="body">${escapeHtml(n.body)}</div></div>`;
+      }).join('');
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    viewBtn.addEventListener('click', () => {
+      loadNotes();
+    });
+  </script>
+</body>
+</html>
