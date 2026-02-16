@@ -1,0 +1,7 @@
+simplenote.exe
+*.exe
+.git
+.gitignore
+docker-compose.yml
+Dockerfile
+.dockerignore
